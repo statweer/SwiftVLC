@@ -1,9 +1,10 @@
-#if os(iOS) || os(macOS)
+#if os(iOS) || os(macOS) || os(tvOS)
 import AVFoundation
 import AVKit
 import CLibVLC
 import Dispatch
 import Observation
+import QuartzCore
 import Synchronization
 
 /// Controls Picture-in-Picture playback for a ``Player``.
@@ -15,9 +16,11 @@ import Synchronization
 ///
 /// Most apps should prefer ``PiPVideoView``, which creates and owns a
 /// `PiPController` behind a single SwiftUI view. On iOS that view uses
-/// libVLC's native drawable PiP integration. On macOS it owns VLC's
-/// native drawable container for inline playback; its native PiP start
-/// path is disabled unless the `PrivateMacOSPiP` SPI opt-in is enabled.
+/// libVLC's native drawable PiP integration. On tvOS it mirrors playback
+/// through an AVKit-owned player layer for PiP eligibility. On macOS it
+/// owns VLC's native drawable container for inline playback; its native
+/// PiP start path is disabled unless the `PrivateMacOSPiP` SPI opt-in
+/// is enabled.
 ///
 /// ```swift
 /// let controller = PiPController(player: player)
@@ -126,6 +129,10 @@ public final class PiPController: NSObject {
   #if os(macOS)
   @ObservationIgnored
   private var nativeBackend: MacNativePiPBackend?
+  #endif
+  #if os(tvOS)
+  @ObservationIgnored
+  private var tvosBridge: TVOSPiPBridge?
   #endif
 
   /// Whether AVKit may start PiP automatically when the app moves to
@@ -267,6 +274,21 @@ public final class PiPController: NSObject {
   /// `videoGravity` is `.resizeAspect`.
   public var layer: AVSampleBufferDisplayLayer {
     displayLayer
+  }
+
+  /// A platform-specific layer that must be attached alongside ``layer``
+  /// for PiP eligibility.
+  ///
+  /// On tvOS this is an `AVPlayerLayer` used only by AVKit's PiP
+  /// machinery. Add it behind ``layer`` and size it to the same bounds.
+  /// On iOS and macOS this is `nil`.
+  public var auxiliaryLayer: CALayer? {
+    #if os(tvOS)
+    _ = ensureTVOSBridgeIfPossible()
+    return tvosBridge?.playerLayer
+    #else
+    return nil
+    #endif
   }
 
   /// Creates a PiP controller for the given player.
@@ -423,6 +445,13 @@ public final class PiPController: NSObject {
       return
     }
     #endif
+    #if os(tvOS)
+    _ = ensureTVOSBridgeIfPossible()
+    if let tvosBridge {
+      tvosBridge.start(from: player.currentTime, vlcWasPlaying: player.isActive)
+      return
+    }
+    #endif
     guard let pipController else { return }
     guard player.currentMedia != nil else { return }
     pipController.startPictureInPicture()
@@ -450,6 +479,12 @@ public final class PiPController: NSObject {
     #if os(macOS)
     if let nativeBackend {
       nativeBackend.stop()
+      return
+    }
+    #endif
+    #if os(tvOS)
+    if let tvosBridge {
+      tvosBridge.stop()
       return
     }
     #endif
@@ -532,6 +567,9 @@ public final class PiPController: NSObject {
   private func setupPiPController() {
     guard AVPictureInPictureController.isPictureInPictureSupported() else { return }
 
+    #if os(tvOS)
+    _ = ensureTVOSBridgeIfPossible()
+    #else
     // `AVPictureInPictureController.ContentSource` declares its
     // `sampleBufferPlaybackDelegate` property as `weak` in the AVKit
     // header, but at runtime it retains the delegate strongly. Passing
@@ -557,6 +595,7 @@ public final class PiPController: NSObject {
     updatePiPPossible(controller.isPictureInPicturePossible)
     updatePiPActive(controller.isPictureInPictureActive)
     observePiPState(of: controller)
+    #endif
   }
 
   private func observePiPState(of controller: AVPictureInPictureController) {
@@ -606,6 +645,51 @@ public final class PiPController: NSObject {
     #endif
     pipController?.invalidatePlaybackState()
   }
+
+  #if os(tvOS)
+  @discardableResult
+  private func ensureTVOSBridgeIfPossible() -> Bool {
+    if tvosBridge != nil {
+      return true
+    }
+
+    guard let url = player.currentMedia?.sourceURL else {
+      return false
+    }
+
+    let bridge = TVOSPiPBridge(owner: self, url: url)
+    tvosBridge = bridge
+    updatePiPPossible(bridge.isPossible)
+    updatePiPActive(bridge.isActive)
+    return true
+  }
+
+  func handleTVOSBridgeStateChanged() {
+    guard let tvosBridge else { return }
+    updatePiPPossible(tvosBridge.isPossible)
+    updatePiPActive(tvosBridge.isActive)
+  }
+
+  func handleTVOSBridgeDidStart() {
+    _ = playbackDriver.pause()
+    handleTVOSBridgeStateChanged()
+  }
+
+  func handleTVOSBridgeDidStop(at currentTime: TimeInterval?, shouldResumeVLC: Bool) {
+    if player.isSeekable,
+       let currentTime,
+       currentTime.isFinite,
+       currentTime > 0 {
+      playbackDriver.seek(.milliseconds(Int64(currentTime * 1000)))
+    }
+
+    if shouldResumeVLC {
+      _ = playbackDriver.resume()
+    }
+
+    handleTVOSBridgeStateChanged()
+  }
+  #endif
 
   /// Cancels any in-flight scheduled pause. Mirrors the pre-refactor
   /// semantics: this **only** cancels the `.scheduled` task. An already-
@@ -715,6 +799,10 @@ public final class PiPController: NSObject {
       var lastRate: Float = 1.0
       for await _ in events {
         guard let self else { return }
+
+        #if os(tvOS)
+        _ = ensureTVOSBridgeIfPossible()
+        #endif
 
         let active = player.isActive
         let durationMs = player.duration?.milliseconds

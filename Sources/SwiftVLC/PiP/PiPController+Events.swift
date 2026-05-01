@@ -1,4 +1,4 @@
-#if os(iOS) || os(macOS)
+#if os(iOS) || os(macOS) || os(tvOS)
 
 /// The reason a Picture-in-Picture window stopped (or is stopping).
 ///

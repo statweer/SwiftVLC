@@ -1,4 +1,4 @@
-#if os(iOS) || os(macOS)
+#if os(iOS) || os(macOS) || os(tvOS)
 import AVFoundation
 
 // MARK: - Audio-session policy
@@ -12,7 +12,7 @@ extension PiPController {
   ///
   /// No-op on macOS, which has no `AVAudioSession`.
   func configureAudioSession() {
-    #if os(iOS)
+    #if os(iOS) || os(tvOS)
     guard managesAudioSession else { return }
     let session = AVAudioSession.sharedInstance()
     try? session.setCategory(.playback, mode: .moviePlayback)
@@ -24,7 +24,7 @@ extension PiPController {
   /// No-op when ``managesAudioSession`` is `false`, after the first
   /// activation, and on platforms without `AVAudioSession`.
   func activateAudioSessionIfNeeded() {
-    #if os(iOS)
+    #if os(iOS) || os(tvOS)
     guard managesAudioSession, !hasActivatedAudioSession else { return }
     hasActivatedAudioSession = true
     try? AVAudioSession.sharedInstance().setActive(true)
