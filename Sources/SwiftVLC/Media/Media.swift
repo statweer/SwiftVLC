@@ -63,6 +63,7 @@ public struct MediaSlave: Sendable, Hashable {
 /// `@MainActor` ``Player`` via `player.load(media)`.
 public final class Media: Sendable {
   nonisolated(unsafe) let pointer: OpaquePointer // libvlc_media_t*
+  let sourceURL: URL?
   let thumbnailCoordinator = ThumbnailCoordinator()
 
   /// Creates media from a URL.
@@ -79,6 +80,7 @@ public final class Media: Sendable {
     else {
       throw .mediaCreationFailed(source: url.absoluteString)
     }
+    sourceURL = url
     pointer = media
   }
 
@@ -89,6 +91,7 @@ public final class Media: Sendable {
     guard let media = libvlc_media_new_path(path) else {
       throw .mediaCreationFailed(source: path)
     }
+    sourceURL = URL(fileURLWithPath: path)
     pointer = media
   }
 
@@ -287,6 +290,7 @@ public final class Media: Sendable {
   /// the pointer from an API that returns a retained reference.
   /// `Media` will call `libvlc_media_release` on deinit.
   init(retaining ptr: OpaquePointer) {
+    sourceURL = nil
     pointer = ptr
   }
 
@@ -301,6 +305,7 @@ public final class Media: Sendable {
     guard let media = libvlc_media_new_fd(fd) else {
       throw .mediaCreationFailed(source: "fd:\(fd)")
     }
+    sourceURL = nil
     pointer = media
   }
 

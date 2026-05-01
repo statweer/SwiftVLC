@@ -1,10 +1,10 @@
-#if os(iOS)
+#if os(iOS) || os(tvOS)
 import AVFoundation
 import SwiftUI
 import UIKit
 
 /// A SwiftUI view that renders video via `AVSampleBufferDisplayLayer`,
-/// enabling Picture-in-Picture support on iOS.
+/// enabling Picture-in-Picture support on iOS and tvOS.
 ///
 /// Unlike ``VideoView``, which uses `libvlc_media_player_set_nsobject()`,
 /// this view uses vmem callbacks for rendering. The two approaches are
@@ -34,6 +34,7 @@ public struct PiPVideoView: UIViewRepresentable {
     let displayLayer = controller.layer
 
     let container = SampleBufferVideoView(displayLayer: displayLayer)
+    container.setAuxiliaryLayer(controller.auxiliaryLayer)
     container.backgroundColor = .black
     container.clipsToBounds = true
 
@@ -56,18 +57,21 @@ public struct PiPVideoView: UIViewRepresentable {
       let controller = PiPController(player: player)
       let displayLayer = controller.layer
       container.setDisplayLayer(displayLayer)
+      container.setAuxiliaryLayer(controller.auxiliaryLayer)
 
       context.coordinator.player = player
       context.coordinator.pipController = controller
       context.coordinator.displayLayer = displayLayer
     }
 
+    container.setAuxiliaryLayer(context.coordinator.pipController?.auxiliaryLayer)
     pushControllerBinding(context.coordinator.pipController, via: context.coordinator)
   }
 
   public static func dismantleUIView(_: UIView, coordinator: Coordinator) {
     coordinator.pipController?.stop()
     coordinator.displayLayer?.removeFromSuperlayer()
+    coordinator.pipController?.auxiliaryLayer?.removeFromSuperlayer()
     coordinator.pipController = nil
     coordinator.displayLayer = nil
     // Clear any external binding so callers who observe it don't
@@ -108,6 +112,7 @@ public struct PiPVideoView: UIViewRepresentable {
 /// sized to fill its bounds on every layout pass.
 private final class SampleBufferVideoView: UIView {
   private var displayLayer: AVSampleBufferDisplayLayer?
+  private var auxiliaryLayer: CALayer?
 
   init(displayLayer: AVSampleBufferDisplayLayer) {
     super.init(frame: .zero)
@@ -127,11 +132,26 @@ private final class SampleBufferVideoView: UIView {
     layoutIfNeeded()
   }
 
+  func setAuxiliaryLayer(_ auxiliaryLayer: CALayer?) {
+    guard self.auxiliaryLayer !== auxiliaryLayer else { return }
+    self.auxiliaryLayer?.removeFromSuperlayer()
+    self.auxiliaryLayer = auxiliaryLayer
+    guard let auxiliaryLayer else { return }
+    if let displayLayer {
+      layer.insertSublayer(auxiliaryLayer, below: displayLayer)
+    } else {
+      layer.addSublayer(auxiliaryLayer)
+    }
+    setNeedsLayout()
+    layoutIfNeeded()
+  }
+
   override func layoutSubviews() {
     super.layoutSubviews()
     // Disable implicit animations so the layer doesn't animate to the new size
     CATransaction.begin()
     CATransaction.setDisableActions(true)
+    auxiliaryLayer?.frame = bounds
     displayLayer?.frame = bounds
     CATransaction.commit()
   }

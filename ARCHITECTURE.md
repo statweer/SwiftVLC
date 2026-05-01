@@ -260,7 +260,7 @@ Network service and renderer discovery.
 | `MediaDiscoverer.swift` | `final class MediaDiscoverer: Sendable` | Discovers media on LAN/SMB/UPnP/SAP. Returns `MediaList` of found items. |
 | `RendererDiscoverer.swift` | `final class RendererDiscoverer: Sendable` | Discovers renderer devices exposed by libVLC plugins. `AsyncStream<RendererEvent>` for add/remove. |
 
-### PiP (iOS/macOS only)
+### PiP (iOS/macOS/tvOS)
 
 Picture-in-Picture uses the platform path that best matches libVLC's
 video output. iOS uses public AVKit sample-buffer PiP. macOS has a

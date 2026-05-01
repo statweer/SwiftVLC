@@ -1,4 +1,4 @@
-#if os(iOS) || os(macOS)
+#if os(iOS) || os(macOS) || os(tvOS)
 @testable import SwiftVLC
 import AVFoundation
 import AVKit

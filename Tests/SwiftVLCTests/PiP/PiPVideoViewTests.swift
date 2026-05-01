@@ -1,4 +1,4 @@
-#if os(iOS) || os(macOS)
+#if os(iOS) || os(macOS) || os(tvOS)
 @_spi(PrivateMacOSPiP) @testable import SwiftVLC
 import AVFoundation
 import SwiftUI
