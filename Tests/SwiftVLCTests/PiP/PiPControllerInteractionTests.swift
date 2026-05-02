@@ -720,6 +720,37 @@ extension Integration {
       #expect(controller.isActive == false)
     }
 
+    @Test
+    func `restoreUserInterface request forwards to handler`() async {
+      let player = Player(instance: TestInstance.shared)
+      let controller = PiPController(player: player)
+      guard AVPictureInPictureController.isPictureInPictureSupported() else { return }
+
+      let contentSource = AVPictureInPictureController.ContentSource(
+        sampleBufferDisplayLayer: controller.layer,
+        playbackDelegate: controller._playbackDelegateForTesting
+      )
+      let pip = AVPictureInPictureController(contentSource: contentSource)
+      var didRequestRestore = false
+
+      controller.restoreUserInterfaceHandler = { completion in
+        didRequestRestore = true
+        completion(true)
+      }
+
+      let restored = await withCheckedContinuation { continuation in
+        controller.pictureInPictureController(
+          pip,
+          restoreUserInterfaceForPictureInPictureStopWithCompletionHandler: { result in
+            continuation.resume(returning: result)
+          }
+        )
+      }
+
+      #expect(didRequestRestore)
+      #expect(restored)
+    }
+
     /// `failedToStartPictureInPicture` also clears the active flag so
     /// UI doesn't stay stuck in a "starting" limbo after an error.
     @Test

@@ -40,6 +40,24 @@ extension PiPController: AVPictureInPictureControllerDelegate {
     }
   }
 
+  public nonisolated func pictureInPictureController(
+    _: AVPictureInPictureController,
+    restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
+  ) {
+    let completion = PiPRestoreCompletion(handler: completionHandler)
+
+    Task { @MainActor [weak self] in
+      guard let self else {
+        completion(false)
+        return
+      }
+
+      self.handleRestoreUserInterface { result in
+        completion(result)
+      }
+    }
+  }
+
   /// `AVPictureInPictureControllerDelegate` hook. SwiftVLC does not
   /// propagate PiP start failures; we still resync the observed flags so
   /// the UI doesn't stay stuck in a stale "starting" state.
@@ -50,6 +68,14 @@ extension PiPController: AVPictureInPictureControllerDelegate {
     pipMainActorSync {
       updatePiPActive(false)
     }
+  }
+}
+
+private struct PiPRestoreCompletion: @unchecked Sendable {
+  let handler: (Bool) -> Void
+
+  func callAsFunction(_ result: Bool) {
+    handler(result)
   }
 }
 

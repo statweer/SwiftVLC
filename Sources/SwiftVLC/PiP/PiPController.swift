@@ -196,6 +196,13 @@ public final class PiPController: NSObject {
   /// Whether a PiP window is currently visible.
   public private(set) var isActive: Bool = false
 
+  /// Called when AVKit requests that the app restore its inline playback UI.
+  ///
+  /// AVKit calls this for the PiP restore button, but not for the close
+  /// button. Use it to present your player UI again, then invoke the
+  /// completion handler with `true` if restoration succeeded.
+  public var restoreUserInterfaceHandler: ((@escaping (Bool) -> Void) -> Void)?
+
   /// The layer that renders video frames for both the inline and PiP
   /// presentations.
   ///
@@ -568,7 +575,20 @@ public final class PiPController: NSObject {
 
     handleTVOSBridgeStateChanged()
   }
+
+  func handleTVOSBridgeRestoreRequested(completionHandler: @escaping (Bool) -> Void) {
+    handleRestoreUserInterface(completionHandler: completionHandler)
+  }
   #endif
+
+  func handleRestoreUserInterface(completionHandler: @escaping (Bool) -> Void) {
+    guard let restoreUserInterfaceHandler else {
+      completionHandler(false)
+      return
+    }
+
+    restoreUserInterfaceHandler(completionHandler)
+  }
 
   /// Cancels any in-flight scheduled pause. Mirrors the pre-refactor
   /// semantics: this **only** cancels the `.scheduled` task. An already-

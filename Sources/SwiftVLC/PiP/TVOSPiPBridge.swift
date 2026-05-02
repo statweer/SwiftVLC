@@ -160,6 +160,24 @@ extension TVOSPiPBridge: AVPictureInPictureControllerDelegate {
 
   nonisolated func pictureInPictureController(
     _: AVPictureInPictureController,
+    restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
+  ) {
+    let completion = TVOSPiPRestoreCompletion(handler: completionHandler)
+
+    Task { @MainActor [weak self] in
+      guard let owner = self?.owner else {
+        completion(false)
+        return
+      }
+
+      owner.handleTVOSBridgeRestoreRequested { result in
+        completion(result)
+      }
+    }
+  }
+
+  nonisolated func pictureInPictureController(
+    _: AVPictureInPictureController,
     failedToStartPictureInPictureWithError _: Error
   ) {
     Task { @MainActor [weak self] in
@@ -167,6 +185,14 @@ extension TVOSPiPBridge: AVPictureInPictureControllerDelegate {
       self.avPlayer.isMuted = true
       self.owner?.handleTVOSBridgeDidStop(at: nil, shouldResumeVLC: self.shouldResumeVLCWhenPiPStops)
     }
+  }
+}
+
+private struct TVOSPiPRestoreCompletion: @unchecked Sendable {
+  let handler: (Bool) -> Void
+
+  func callAsFunction(_ result: Bool) {
+    handler(result)
   }
 }
 #endif
