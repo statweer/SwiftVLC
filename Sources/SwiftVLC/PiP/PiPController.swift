@@ -689,6 +689,15 @@ public final class PiPController: NSObject {
 
     handleTVOSBridgeStateChanged()
   }
+
+  func handleTVOSBridgeRestoreRequested(_ completion: @escaping @MainActor (Bool) -> Void) {
+    notePendingStopReason(.restoreRequested)
+    guard let onRestoreUserInterface else {
+      completion(true)
+      return
+    }
+    onRestoreUserInterface(completion)
+  }
   #endif
 
   /// Cancels any in-flight scheduled pause. Mirrors the pre-refactor
