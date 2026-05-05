@@ -4,9 +4,9 @@ import Testing
 
 /// Covers the error paths on `Player`'s `throws(VLCError)` API.
 ///
-/// Each test forces libVLC into a state where the underlying call is
-/// guaranteed to fail, then asserts the typed-throw shape. Pairs with
-/// `PlayerTests` which covers the success paths.
+/// Tests force SwiftVLC or libVLC into documented success/failure
+/// boundaries and assert the typed wrapper behavior. Pairs with
+/// `PlayerTests` which covers the broad success paths.
 extension Integration {
   @Suite(.tags(.mainActor))
   @MainActor struct PlayerThrowsTests {
@@ -90,6 +90,20 @@ extension Integration {
     func `setDeinterlace with named mode succeeds`() throws {
       let player = Player(instance: TestInstance.shared)
       try player.setDeinterlace(state: 1, mode: "blend")
+    }
+
+    @Test
+    func `setDeinterlace with unknown mode follows libVLC result`() throws {
+      let player = Player(instance: TestInstance.shared)
+
+      do {
+        try player.setDeinterlace(state: 1, mode: "__swiftvlc_unknown_deinterlace_mode__")
+      } catch {
+        guard case .operationFailed("Set deinterlace") = error else {
+          Issue.record("Expected operationFailed Set deinterlace, got \(error)")
+          return
+        }
+      }
     }
 
     @Test

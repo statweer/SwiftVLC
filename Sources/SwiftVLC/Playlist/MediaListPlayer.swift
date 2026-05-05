@@ -135,22 +135,29 @@ public final class MediaListPlayer {
   }
 
   /// Plays the item at the specified index.
-  /// - Throws: ``VLCError/invalidInput(_:)`` if the index is out of range for the
+  /// - Throws: ``VLCError/invalidState(_:)`` if no media list is attached,
+  ///   ``VLCError/invalidInput(_:)`` if the index is out of range for the
   ///   attached list, or ``VLCError/operationFailed(_:)`` if libVLC rejects it.
-  public func play(at index: Int) throws(VLCError) {
-    let count = _mediaList?.count
-    if let count, !(0..<count).contains(index) {
+  public func play(at requestedIndex: Int) throws(VLCError) {
+    let index = try checkedNonnegativeInt32(requestedIndex, parameter: "index")
+    guard let count = _mediaList?.count else {
+      throw .invalidState("mediaList must be set before playing by index")
+    }
+    if !(0..<count).contains(requestedIndex) {
       throw .invalidInput("index must be in 0..<\(count)")
     }
-    let index = try checkedNonnegativeInt32(index, parameter: "index")
     guard libvlc_media_list_player_play_item_at_index(pointer, index) == 0 else {
       throw .operationFailed("Play item at index \(index)")
     }
   }
 
   /// Plays a specific media item from the list.
-  /// - Throws: `VLCError.operationFailed` if the item is not in the list.
+  /// - Throws: ``VLCError/invalidState(_:)`` if no media list is attached,
+  ///   or ``VLCError/operationFailed(_:)`` if the item is not in the list.
   public func play(_ media: borrowing Media) throws(VLCError) {
+    guard _mediaList != nil else {
+      throw .invalidState("mediaList must be set before playing an item")
+    }
     guard libvlc_media_list_player_play_item(pointer, media.pointer) == 0 else {
       throw .operationFailed("Play media item")
     }
