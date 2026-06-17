@@ -104,6 +104,12 @@ public struct PiPVideoView: UIViewRepresentable {
   }
 
   public static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+    if coordinator.pipController?.isActive == true {
+      // The native PiP backend owns the floating window now; detaching here
+      // stops PiP while the host app dismisses its inline/fullscreen view.
+      return
+    }
+
     if let container = uiView as? IOSNativePiPHostView {
       container.detach()
     } else {

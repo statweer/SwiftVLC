@@ -92,6 +92,28 @@ extension Integration {
 
     #if canImport(UIKit)
     @Test
+    func `iOS dismantle keeps active native PiP attached`() {
+      let player = Player(instance: TestInstance.shared)
+      let view = PiPVideoView(player)
+      let coordinator = view.makeCoordinator()
+      let host = IOSNativePiPHostView()
+      let controller = PiPController(
+        player: player,
+        nativeBackend: host.nativePiPBackend
+      )
+
+      host.attach(to: player)
+      coordinator.pipController = controller
+      coordinator.player = player
+      controller.handleNativePictureInPictureActiveChanged(true)
+
+      PiPVideoView.dismantleUIView(host, coordinator: coordinator)
+
+      #expect(player.drawable === host.drawableView)
+      #expect(coordinator.pipController === controller)
+    }
+
+    @Test
     func `iOS native PiP host attaches drawable child`() {
       let player = Player(instance: TestInstance.shared)
       let host = IOSNativePiPHostView()
